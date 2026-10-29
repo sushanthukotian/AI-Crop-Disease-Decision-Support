@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms, models
 from PIL import Image
+import gc
 
 from app.ml.cnn_model import CropDiseaseModel
 from app.ml.image_utils import extract_leaf_roi, validate_crop_leaf
@@ -78,8 +79,9 @@ def _build_model_architecture(model_type, num_classes):
     return network
 
 
+
 def _load_single_model(name, filename, num_classes, target_device):
-    """Load a trained PyTorch checkpoint."""
+    """Load a trained model while reducing peak RAM usage."""
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
     checkpoint_path = os.path.join(current_dir, filename)
@@ -88,55 +90,96 @@ def _load_single_model(name, filename, num_classes, target_device):
         print(f"Model checkpoint not found: {checkpoint_path}")
         return None
 
+    checkpoint = None
+    state_dict = None
+    clean_state_dict = None
+    network = None
+
     try:
         print(f"Loading model '{name}' from {filename}...")
 
+        # Build the exact architecture used during training.
         network = _build_model_architecture(filename, num_classes)
 
-        # Load the checkpoint onto CPU first to reduce device-related issues.
+        # Memory-mapped loading can reduce peak RAM usage.
         try:
             checkpoint = torch.load(
                 checkpoint_path,
                 map_location="cpu",
-                weights_only=True
+                weights_only=True,
+                mmap=True
             )
-        except TypeError:
-            # Compatibility with older PyTorch versions.
-            checkpoint = torch.load(
-                checkpoint_path,
-                map_location="cpu"
-            )
+        except (TypeError, RuntimeError):
+            # Compatibility fallback for older PyTorch versions
+            # or checkpoint formats that do not support mmap.
+            try:
+                checkpoint = torch.load(
+                    checkpoint_path,
+                    map_location="cpu",
+                    weights_only=True
+                )
+            except TypeError:
+                checkpoint = torch.load(
+                    checkpoint_path,
+                    map_location="cpu"
+                )
 
-        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
-            state_dict = checkpoint["model_state_dict"]
-        elif isinstance(checkpoint, dict) and "state_dict" in checkpoint:
-            state_dict = checkpoint["state_dict"]
+        if isinstance(checkpoint, dict):
+            if "model_state_dict" in checkpoint:
+                state_dict = checkpoint["model_state_dict"]
+            elif "state_dict" in checkpoint:
+                state_dict = checkpoint["state_dict"]
+            else:
+                state_dict = checkpoint
         else:
-            state_dict = checkpoint
+            raise ValueError("Invalid model checkpoint format.")
 
         if not isinstance(state_dict, dict):
-            raise ValueError("Checkpoint does not contain a valid state dictionary.")
+            raise ValueError("Checkpoint has no valid state dictionary.")
 
-        # Remove common prefixes added during training.
         clean_state_dict = {}
+
         for key, value in state_dict.items():
             if key.startswith("module."):
                 key = key[len("module."):]
-
             if key.startswith("model."):
                 key = key[len("model."):]
-
             clean_state_dict[key] = value
 
-        network.load_state_dict(clean_state_dict, strict=True)
+        # assign=True avoids copying every checkpoint tensor into
+        # newly allocated model parameters when supported.
+        try:
+            network.load_state_dict(
+                clean_state_dict,
+                strict=True,
+                assign=True
+            )
+        except TypeError:
+            network.load_state_dict(clean_state_dict, strict=True)
+
         network.to(target_device)
         network.eval()
+
+        # Release temporary references before returning the model.
+        del clean_state_dict
+        del state_dict
+        del checkpoint
+        gc.collect()
 
         print(f"Successfully loaded '{name}' from {filename}")
         return network
 
     except Exception as exc:
         print(f"Failed to load '{name}' from {filename}: {exc}")
+        import traceback
+        traceback.print_exc()
+
+        del clean_state_dict
+        del state_dict
+        del checkpoint
+        del network
+        gc.collect()
+
         return None
 
 
