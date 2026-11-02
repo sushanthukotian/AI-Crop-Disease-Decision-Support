@@ -170,6 +170,7 @@ body {
 .app-main {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 2rem;
     padding-bottom: calc(var(--bottom-nav-height) + 1rem);
 }
@@ -179,7 +180,7 @@ body {
     display: none;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.2rem;
+    padding: 0.9rem 1.2rem;
     background: var(--glass-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -187,12 +188,34 @@ body {
     position: sticky;
     top: 0;
     z-index: 50;
+    gap: 0.5rem;
 }
 
 .mobile-header .logo {
-    font-size: 1.1rem;
+    font-size: 0.98rem;
     font-weight: 700;
     color: var(--primary);
+}
+
+.mobile-logout-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 8px;
+    background: rgba(220, 38, 38, 0.1);
+    color: #dc2626;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid rgba(220, 38, 38, 0.25);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.mobile-logout-btn:hover {
+    background: #dc2626;
+    color: white;
 }
 
 /* MOBILE BOTTOM NAV */
@@ -503,6 +526,7 @@ body {
     .app-main {
         padding: 1rem;
         padding-bottom: calc(var(--bottom-nav-height) + 1rem);
+        overflow-x: hidden;
     }
 
     .hero h1 {
@@ -514,10 +538,43 @@ body {
         border-radius: 14px;
     }
 
+    .glass-panel1 {
+        width: 100%;
+        max-width: 420px;
+        padding: 1.75rem 1.25rem;
+        border-radius: 14px;
+        margin: 0 auto;
+    }
+
+    .auth-container h2 {
+        font-size: 1.45rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .container {
+        padding: 1.5rem 1rem;
+        width: 100%;
+    }
+
     .navbar {
         flex-direction: column;
         gap: 0.8rem;
         padding: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .glass-panel1 {
+        padding: 1.5rem 1rem;
+    }
+
+    .auth-container h2 {
+        font-size: 1.35rem;
+        margin-bottom: 1rem;
+    }
+
+    .mobile-logout-btn .logout-label {
+        display: none;
     }
 }
 
