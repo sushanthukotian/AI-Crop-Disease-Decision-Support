@@ -85,7 +85,15 @@
                         style="height: 28px; width: auto; margin-right: 8px;">
                     <span class="logo">ML Based Crop Disease Detection</span>
                 </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+    <span style="...">{{ session.get('name', '') }}</span>
+    <a href="{{ url_for('auth.logout') }}" class="mobile-logout-btn" title="Logout">
+        <span>🚪</span>
+        <span class="logout-label">Logout</span>
+    </a>
+</div>
                 <span style="color:#555;font-size:0.9rem;">{{ session.get('name', '') }}</span>
+                
             </header>
 
             <!-- Flash Messages -->
