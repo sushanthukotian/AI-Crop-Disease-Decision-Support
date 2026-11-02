@@ -1,8 +1,9 @@
-import requests
+
 import os
 import io
 import csv
 import time
+import requests
 
 from flask import (
     Blueprint,
@@ -32,9 +33,7 @@ def allowed_file(filename):
     )
 
 
-
 @detection_bp.route("/detect", methods=["GET", "POST"])
-
 def detect():
     current_app.logger.info("DETECT ROUTE ENTERED")
 
@@ -55,24 +54,13 @@ def detect():
             flash("Please select an image.", "error")
             return redirect(request.url)
 
-        allowed_extensions = {"jpg", "jpeg", "png"}
-
         extension = file.filename.rsplit(".", 1)[-1].lower()
 
-        if "." not in file.filename or extension not in allowed_extensions:
+        if "." not in file.filename or extension not in ALLOWED_EXTENSIONS:
             flash("Please upload a JPG, JPEG, or PNG image.", "error")
             return redirect(request.url)
 
         current_app.logger.info("Image received: %s", file.filename)
-
-        
-        if file.filename == "":
-            flash("No selected image", "error")
-            return redirect(request.url)
-
-        if not allowed_file(file.filename):
-            flash("Please upload a PNG, JPG, or JPEG image.", "error")
-            return redirect(url_for("detection.detect"))
 
         filename = secure_filename(file.filename)
         unique_filename = f"{int(time.time())}_{filename}"
@@ -92,30 +80,62 @@ def detect():
             flash("Could not save the uploaded image.", "error")
             return redirect(url_for("detection.detect"))
 
-        # Run crop disease prediction
+        # Run prediction using cloud inference API
         try:
-            current_app.logger.info("Starting crop disease prediction")
-
-            from app.ml.inference import predict_disease
-
             current_app.logger.info(
-                "Loading model / running prediction"
+                "Sending image to cloud inference API"
             )
 
-            crop, disease, confidence, error_msg = predict_disease(
-                filepath
-            )
+            inference_url = os.environ.get("INFERENCE_API_URL")
+            inference_key = os.environ.get("INFERENCE_API_KEY")
+
+            if not inference_url or not inference_key:
+                raise RuntimeError(
+                    "Inference API environment variables are missing"
+                )
+
+            with open(filepath, "rb") as image_file:
+                response = requests.post(
+                    inference_url,
+                    headers={"X-API-Key": inference_key},
+                    files={
+                        "image": (
+                            os.path.basename(filepath),
+                            image_file,
+                            "application/octet-stream",
+                        )
+                    },
+                    timeout=300,
+                )
+
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"Inference API error ({response.status_code}): "
+                    f"{response.text[:500]}"
+                )
+
+            prediction = response.json()
+
+            crop = prediction["crop"]
+            disease = prediction["disease"]
+            confidence = float(prediction["confidence"])
+            error_msg = None
 
             current_app.logger.info(
-                "Crop disease prediction completed"
+                "Cloud prediction completed: %s - %s (%.2f%%)",
+                crop,
+                disease,
+                confidence,
             )
 
         except Exception:
             current_app.logger.exception(
-                "Crop disease prediction failed"
+                "Cloud crop disease prediction failed"
             )
+
             flash(
-                "Prediction failed. Please check server logs.",
+                "Prediction failed. Please check the inference service "
+                "and server logs.",
                 "error",
             )
 
@@ -159,6 +179,7 @@ def detect():
             current_app.logger.exception(
                 "Failed to save detection record"
             )
+
             flash(
                 "The prediction completed, but the result "
                 "could not be saved.",
@@ -194,7 +215,6 @@ def result(detection_id):
     plots = {}
 
     try:
-        # Import analysis code only when the result page is requested.
         from app.ml.analisis import get_all_plots_base64
 
         img_full_path = os.path.join(
