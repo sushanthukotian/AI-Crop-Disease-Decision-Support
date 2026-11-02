@@ -91,6 +91,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="margin: 0; color: var(--primary-dark);">My Profile</h2>
         <a href="{{ url_for('main.update_profile') }}" class="btn btn-outline" style="padding: 0.5rem 1rem;">✏️ Edit Profile</a>
+         <a href="{{ url_for('auth.logout') }}" class="btn" style="padding: 0.5rem 1rem; background: #fee2e2; color: #b91c1c; border: 1px solid #f87171; text-decoration: none; font-weight: 600;">🚪 Logout</a>
     </div>
     <div class="glass-panel" style="margin-bottom:1.5rem;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
@@ -187,6 +188,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="margin: 0; color: var(--primary-dark);">My Profile</h2>
         <a href="{{ url_for('main.update_profile') }}" class="btn btn-outline" style="padding: 0.5rem 1rem;">✏️ Edit Profile</a>
+         <a href="{{ url_for('auth.logout') }}" class="btn" style="padding: 0.5rem 1rem; background: #fee2e2; color: #b91c1c; border: 1px solid #f87171; text-decoration: none; font-weight: 600;">🚪 Logout</a>
     </div>
     <div class="glass-panel" style="margin-bottom:1.5rem;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
@@ -202,6 +204,11 @@
         <h3 style="margin-bottom:0.5rem;">📍 My Practice Location</h3>
         <p style="color:#666;font-size:0.9rem;">Your location is shown below based on browser geolocation.</p>
         <div id="profile-map" class="map-container" style="height: 480px; min-height: 480px;"></div>
+    </div>
+     <div style="text-align: center; margin-top: 1.5rem; margin-bottom: 2rem;">
+        <a href="{{ url_for('auth.logout') }}" class="btn" style="background: #dc2626; color: white; padding: 0.8rem 2.5rem; border-radius: 10px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+            <span>🚪</span> Log Out of Account
+        </a>
     </div>
 </div>
 
