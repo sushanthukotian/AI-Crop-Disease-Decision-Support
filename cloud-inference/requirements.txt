@@ -5,3 +5,5 @@ torchvision>=0.15
 opencv-python-headless>=4.8
 Pillow>=10.0
 numpy>=1.24
+pymongo>=4.6
+dnspython>=2.0
