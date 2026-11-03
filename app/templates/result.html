@@ -15,43 +15,47 @@
             <p><strong>Crop Detected:</strong> <span class="highlight">{{ detection.crop }}</span></p>
             
             {% if detection.disease.lower() == 'healthy' %}
-                <div class="alert alert-success"
-     role="status"
-     style="
-        margin: 1rem 0;
-        padding: 10px 14px;
-        border: 1px solid #28a745;
-        border-radius: 8px;
-        background: #eaf8ed;
-        color: #176b32;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        font-size: 14px;
-        animation: healthyPop 0.5s ease-out;
-     ">
+               <div class="crop-detection-section">
 
-    <span style="
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 24px;
-        min-width: 24px;
-        border-radius: 50%;
-        background: #28a745;
-        color: white;
-        font-size: 15px;
-        font-weight: bold;
-        animation: checkPop 0.5s ease-out 0.2s both;
-    ">✓</span>
+    <!-- Your existing crop detection details -->
 
-    <span>
-        <strong>Status: Healthy!</strong>
-        No disease detected.
-    </span>
+    <div class="alert alert-success"
+         role="status"
+         style="
+            margin: 10px 0;
+            padding: 10px 14px;
+            border: 1px solid #28a745;
+            border-radius: 8px;
+            background: #eaf8ed;
+            color: #176b32;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            animation: healthyPop 0.5s ease-out;
+         ">
 
+        <span style="
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            border-radius: 50%;
+            background: #28a745;
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            animation: checkPop 0.5s ease-out 0.2s both;
+        ">✓</span>
+
+        <span>
+            <strong>Status: Healthy!</strong>
+            No disease detected.
+        </span>
+
+    </div>
 </div>
 
 <style>
@@ -71,18 +75,11 @@
 }
 
 @keyframes checkPop {
-    0% {
-        transform: scale(0);
-    }
-    70% {
-        transform: scale(1.2);
-    }
-    100% {
-        transform: scale(1);
-    }
+    0% { transform: scale(0); }
+    70% { transform: scale(1.2); }
+    100% { transform: scale(1); }
 }
-</style>
-                <p>Your crop appears to be in good health. Keep up the good work!</p>
+</style>                <p>Your crop appears to be in good health. Keep up the good work!</p>
             {% else %}
                 <p><strong>Disease Predicted:</strong> <span class="highlight-danger">{{ detection.disease }}</span></p>
                 <div class="confidence-bar" style="margin: 1rem 0;">
