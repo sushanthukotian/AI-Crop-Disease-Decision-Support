@@ -22,4 +22,9 @@ COPY cloud-inference/inference_api.py /service/inference_api.py
 ENV PYTHONPATH=/service
 
 CMD exec gunicorn --bind "0.0.0.0:${PORT:-8080}" \
-    --workers 1 --threads 1 --timeout 300 inference_api:app
+    --workers 1 \
+    --threads 1 \
+    --timeout 300 \
+    --max-requests 20 \
+    --max-requests-jitter 5 \
+    inference_api:app
