@@ -34,6 +34,105 @@ def allowed_file(filename):
     )
 
 
+def send_image_to_inference(filepath, inference_url, inference_key):
+    """
+    Send an image to the cloud inference API.
+    Retry temporary Render errors and connection failures.
+    """
+
+    max_attempts = 4
+    retry_delays = [5, 10, 15]
+
+    for attempt in range(max_attempts):
+        try:
+            current_app.logger.info(
+                "Inference request attempt %s/%s",
+                attempt + 1,
+                max_attempts,
+            )
+
+            # Reopen the file for each attempt
+            with open(filepath, "rb") as image_file:
+                response = requests.post(
+                    inference_url,
+                    headers={
+                        "X-API-Key": inference_key
+                    },
+                    files={
+                        "image": (
+                            os.path.basename(filepath),
+                            image_file,
+                            "application/octet-stream",
+                        )
+                    },
+                    timeout=(30, 300),
+                )
+
+            current_app.logger.info(
+                "Inference API response status: %s",
+                response.status_code,
+            )
+
+            if response.status_code == 200:
+                return response
+
+            # Retry temporary server/proxy errors only
+            if response.status_code in (502, 503, 504):
+                current_app.logger.warning(
+                    "Temporary inference error. "
+                    "Status: %s | Attempt: %s/%s | Response: %r",
+                    response.status_code,
+                    attempt + 1,
+                    max_attempts,
+                    response.text[:500],
+                )
+
+                if attempt < max_attempts - 1:
+                    response.close()
+                    time.sleep(retry_delays[attempt])
+                    continue
+
+            # Do not retry authentication, validation or other errors
+            error_message = (
+                f"Inference API returned HTTP "
+                f"{response.status_code}: {response.text[:500]}"
+            )
+            response.close()
+            raise RuntimeError(error_message)
+
+        except requests.exceptions.Timeout:
+            current_app.logger.warning(
+                "Inference API request timed out. "
+                "Attempt: %s/%s",
+                attempt + 1,
+                max_attempts,
+                exc_info=True,
+            )
+
+            if attempt < max_attempts - 1:
+                time.sleep(retry_delays[attempt])
+                continue
+
+            raise
+
+        except requests.exceptions.ConnectionError:
+            current_app.logger.warning(
+                "Could not connect to inference service. "
+                "Attempt: %s/%s",
+                attempt + 1,
+                max_attempts,
+                exc_info=True,
+            )
+
+            if attempt < max_attempts - 1:
+                time.sleep(retry_delays[attempt])
+                continue
+
+            raise
+
+    raise RuntimeError("Inference service could not be reached.")
+
+
 @detection_bp.route("/detect", methods=["GET", "POST"])
 def detect():
     current_app.logger.info("DETECT ROUTE ENTERED")
@@ -131,42 +230,15 @@ def detect():
                     "Inference API environment variables are missing"
                 )
 
-            with open(filepath, "rb") as image_file:
-
-                response = requests.post(
-                    inference_url,
-                    headers={
-                        "X-API-Key": inference_key
-                    },
-                    files={
-                        "image": (
-                            os.path.basename(filepath),
-                            image_file,
-                            "application/octet-stream",
-                        )
-                    },
-                    timeout=(30, 300),
-                )
-
-            current_app.logger.info(
-                "Inference API response status: %s",
-                response.status_code,
+            response = send_image_to_inference(
+                filepath,
+                inference_url,
+                inference_key,
             )
-
-            if response.status_code != 200:
-                current_app.logger.error(
-                    "Inference API error. Status: %s | Response: %r",
-                    response.status_code,
-                    response.text[:1000],
-                )
-
-                raise RuntimeError(
-                    f"Inference API returned HTTP "
-                    f"{response.status_code}"
-                )
 
             # Parse prediction response
             prediction = response.json()
+            response.close()
 
             crop = prediction["crop"]
             disease = prediction["disease"]
@@ -208,8 +280,8 @@ def detect():
             )
 
             flash(
-                "Prediction failed. Please try again. "
-                "If the problem continues, contact the administrator.",
+                "Prediction failed after multiple attempts. "
+                "Please try again later.",
                 "error",
             )
 
