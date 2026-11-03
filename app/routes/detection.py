@@ -24,6 +24,7 @@ from app.models.detection import Detection
 detection_bp = Blueprint("detection", __name__)
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 def allowed_file(filename):
@@ -44,8 +45,9 @@ def detect():
     if request.method == "POST":
         current_app.logger.info("DETECT POST RECEIVED")
 
+        # Check whether an image was submitted
         if "image" not in request.files:
-            flash("No image part.", "error")
+            flash("No image part. Please select an image.", "error")
             return redirect(request.url)
 
         file = request.files["image"]
@@ -54,15 +56,41 @@ def detect():
             flash("Please select an image.", "error")
             return redirect(request.url)
 
-        extension = file.filename.rsplit(".", 1)[-1].lower()
+        # Validate extension
+        if not allowed_file(file.filename):
+            flash(
+                "Please upload a JPG, JPEG, or PNG image.",
+                "error",
+            )
+            return redirect(url_for("detection.detect"))
 
-        if "." not in file.filename or extension not in ALLOWED_EXTENSIONS:
-            flash("Please upload a JPG, JPEG, or PNG image.", "error")
-            return redirect(request.url)
+        # Measure uploaded image size
+        file.seek(0, 2)
+        image_size = file.tell()
+        file.seek(0)
 
-        current_app.logger.info("Image received: %s", file.filename)
+        current_app.logger.info(
+            "Uploaded image: %s | Size: %.2f MB",
+            file.filename,
+            image_size / (1024 * 1024),
+        )
 
+        # Reject images larger than 10 MB
+        if image_size > MAX_IMAGE_SIZE:
+            flash(
+                "Image is too large. Please upload an image "
+                "smaller than 10 MB.",
+                "error",
+            )
+            return redirect(url_for("detection.detect"))
+
+        # Generate a safe unique filename
         filename = secure_filename(file.filename)
+
+        if not filename:
+            flash("Invalid image filename.", "error")
+            return redirect(url_for("detection.detect"))
+
         unique_filename = f"{int(time.time())}_{filename}"
 
         upload_folder = current_app.config["UPLOAD_FOLDER"]
@@ -73,11 +101,20 @@ def detect():
         # Save uploaded image
         try:
             file.save(filepath)
-            current_app.logger.info("Uploaded image saved successfully")
+
+            current_app.logger.info(
+                "Uploaded image saved successfully: %s",
+                filepath,
+            )
 
         except Exception:
-            current_app.logger.exception("Failed to save uploaded image")
-            flash("Could not save the uploaded image.", "error")
+            current_app.logger.exception(
+                "Failed to save uploaded image"
+            )
+            flash(
+                "Could not save the uploaded image.",
+                "error",
+            )
             return redirect(url_for("detection.detect"))
 
         # Run prediction using cloud inference API
@@ -95,9 +132,12 @@ def detect():
                 )
 
             with open(filepath, "rb") as image_file:
+
                 response = requests.post(
                     inference_url,
-                    headers={"X-API-Key": inference_key},
+                    headers={
+                        "X-API-Key": inference_key
+                    },
                     files={
                         "image": (
                             os.path.basename(filepath),
@@ -105,15 +145,27 @@ def detect():
                             "application/octet-stream",
                         )
                     },
-                    timeout=300,
+                    timeout=(30, 300),
                 )
+
+            current_app.logger.info(
+                "Inference API response status: %s",
+                response.status_code,
+            )
 
             if response.status_code != 200:
-                raise RuntimeError(
-                    f"Inference API error ({response.status_code}): "
-                    f"{response.text[:500]}"
+                current_app.logger.error(
+                    "Inference API error. Status: %s | Response: %r",
+                    response.status_code,
+                    response.text[:1000],
                 )
 
+                raise RuntimeError(
+                    f"Inference API returned HTTP "
+                    f"{response.status_code}"
+                )
+
+            # Parse prediction response
             prediction = response.json()
 
             crop = prediction["crop"]
@@ -122,11 +174,33 @@ def detect():
             error_msg = None
 
             current_app.logger.info(
-                "Cloud prediction completed: %s - %s (%.2f%%)",
+                "Cloud prediction completed: "
+                "%s - %s (%.2f%%)",
                 crop,
                 disease,
                 confidence,
             )
+
+        except requests.exceptions.Timeout:
+            current_app.logger.exception(
+                "Inference API request timed out"
+            )
+
+            flash(
+                "Prediction is taking too long. "
+                "Please try again after some time.",
+                "error",
+            )
+
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    current_app.logger.exception(
+                        "Could not remove uploaded image"
+                    )
+
+            return redirect(url_for("detection.detect"))
 
         except Exception:
             current_app.logger.exception(
@@ -134,19 +208,18 @@ def detect():
             )
 
             flash(
-                "Prediction failed. Please check the inference service "
-                "and server logs.",
+                "Prediction failed. Please try again. "
+                "If the problem continues, contact the administrator.",
                 "error",
             )
 
-            # Clean up uploaded image
-            try:
-                if os.path.exists(filepath):
+            if os.path.exists(filepath):
+                try:
                     os.remove(filepath)
-            except OSError:
-                current_app.logger.exception(
-                    "Could not remove uploaded image"
-                )
+                except OSError:
+                    current_app.logger.exception(
+                        "Could not remove uploaded image"
+                    )
 
             return redirect(url_for("detection.detect"))
 
@@ -181,7 +254,7 @@ def detect():
             )
 
             flash(
-                "The prediction completed, but the result "
+                "Prediction completed, but the result "
                 "could not be saved.",
                 "error",
             )
@@ -207,9 +280,13 @@ def result(detection_id):
 
     if (
         not detection_record
-        or str(detection_record.get("user_id")) != str(session["user_id"])
+        or str(detection_record.get("user_id"))
+        != str(session["user_id"])
     ):
-        flash("Result not found or unauthorized access.", "error")
+        flash(
+            "Result not found or unauthorized access.",
+            "error",
+        )
         return redirect(url_for("main.dashboard"))
 
     plots = {}
@@ -228,7 +305,10 @@ def result(detection_id):
             current_image_path=img_full_path,
             crop=detection_record.get("crop", "Crop"),
             disease=detection_record.get("disease", "Detection"),
-            confidence=detection_record.get("confidence", 0.0),
+            confidence=detection_record.get(
+                "confidence",
+                0.0,
+            ),
         )
 
     except Exception:
@@ -253,7 +333,8 @@ def download_plot(detection_id, plot_type="diagnostic"):
 
     if (
         not detection_record
-        or str(detection_record.get("user_id")) != str(session["user_id"])
+        or str(detection_record.get("user_id"))
+        != str(session["user_id"])
     ):
         flash("Unauthorized access.", "error")
         return redirect(url_for("main.dashboard"))
@@ -272,13 +353,22 @@ def download_plot(detection_id, plot_type="diagnostic"):
         current_image_path=img_full_path,
         crop=detection_record.get("crop", "Crop"),
         disease=detection_record.get("disease", "Detection"),
-        confidence=detection_record.get("confidence", 0.0),
+        confidence=detection_record.get(
+            "confidence",
+            0.0,
+        ),
     )
 
     if buf is None:
-        flash("Unable to generate plot for download.", "error")
+        flash(
+            "Unable to generate plot for download.",
+            "error",
+        )
         return redirect(
-            url_for("detection.result", detection_id=detection_id)
+            url_for(
+                "detection.result",
+                detection_id=detection_id,
+            )
         )
 
     plot_names = {
@@ -288,7 +378,10 @@ def download_plot(detection_id, plot_type="diagnostic"):
         "3": "Crop_Disease_Heatmap",
     }
 
-    name = plot_names.get(str(plot_type), f"Plot_{plot_type}")
+    name = plot_names.get(
+        str(plot_type),
+        f"Plot_{plot_type}",
+    )
 
     return send_file(
         buf,
@@ -307,7 +400,8 @@ def download_csv(detection_id):
 
     if (
         not detection_record
-        or str(detection_record.get("user_id")) != str(session["user_id"])
+        or str(detection_record.get("user_id"))
+        != str(session["user_id"])
     ):
         flash("Unauthorized access.", "error")
         return redirect(url_for("main.dashboard"))
@@ -339,6 +433,7 @@ def download_csv(detection_id):
         "Aspect_Ratio",
         "Edge_Density",
     ]
+
     cw.writerow(headers)
 
     row = [
@@ -355,6 +450,7 @@ def download_csv(detection_id):
         f"{feats.get('Aspect Ratio', 0.0):.2f}",
         f"{feats.get('Edge Density', 0.0):.2f}",
     ]
+
     cw.writerow(row)
 
     safe_crop = str(
