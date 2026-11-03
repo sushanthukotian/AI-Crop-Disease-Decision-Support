@@ -15,9 +15,60 @@
             <p><strong>Crop Detected:</strong> <span class="highlight">{{ detection.crop }}</span></p>
             
             {% if detection.disease.lower() == 'healthy' %}
-                <div class="alert alert-success" style="margin: 1rem 0;">
-                    <strong>Status: Healthy!</strong> No disease detected.
-                </div>
+                <div class="alert alert-success"
+     role="status"
+     style="
+        margin: 1rem 0;
+        padding: 18px;
+        border: 1px solid #28a745;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #e8fbe9, #ffffff);
+        color: #176b32;
+        text-align: center;
+        animation: healthySlide 0.7s ease-out;
+     ">
+
+    <span style="
+        display: inline-flex;
+        width: 35px;
+        height: 35px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #28a745;
+        color: white;
+        font-size: 22px;
+        animation: healthyPop 0.5s ease 0.3s both;
+    ">✓</span>
+
+    <div style="margin-top: 8px;">
+        <strong style="font-size: 18px;">
+            Status: Healthy!
+        </strong>
+        <div style="margin-top: 5px;">
+            No disease detected. Your crop appears healthy!
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes healthySlide {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes healthyPop {
+    0% { transform: scale(0); }
+    70% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+</style>
                 <p>Your crop appears to be in good health. Keep up the good work!</p>
             {% else %}
                 <p><strong>Disease Predicted:</strong> <span class="highlight-danger">{{ detection.disease }}</span></p>
