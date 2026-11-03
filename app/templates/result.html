@@ -17,7 +17,7 @@
             {% if detection.disease.lower() == 'healthy' %}
                <div class="crop-detection-section">
 
-    <!-- Your existing crop detection details -->
+    <!-- <!-- Your existing crop detection details -->
 
     <div class="alert alert-success"
          role="status"
@@ -79,7 +79,12 @@
     70% { transform: scale(1.2); }
     100% { transform: scale(1); }
 }
-</style>                <p>Your crop appears to be in good health. Keep up the good work!</p>
+</style>       -->     
+            
+            <p>Your crop appears to be in good health. Keep up the good work!</p> 
+            <p style="color: green; font-weight: bold;">
+    ✓ Status: Healthy 💚! No disease detected.
+</p>
             {% else %}
                 <p><strong>Disease Predicted:</strong> <span class="highlight-danger">{{ detection.disease }}</span></p>
                 <div class="confidence-bar" style="margin: 1rem 0;">
